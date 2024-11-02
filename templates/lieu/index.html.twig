@@ -1,0 +1,103 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Liste des Lieux{% endblock %}
+
+{% block body %}
+    <h1>Liste des lieux à visiter</h1>
+    <div id="map" style="height: 500px;"></div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <style>
+        .popup-content {
+            max-width: 300px; /* Largeur maximum de la boîte de dialogue */
+        }
+
+        .swiper-container {
+            width: 100%; /* Largeur qui prend tout l'espace disponible dans la popup */
+            height: 200px; /* Hauteur des images */
+            overflow: hidden; /* Cache les images en dehors du cadre de Swiper */
+        }
+
+        .swiper-slide {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .popup-image {
+            width: 100%; /* Largeur de l'image adaptée au conteneur */
+            height: 100%; /* Hauteur de l'image pour remplir le conteneur */
+            object-fit: cover; /* Adapter l'image pour qu'elle remplisse bien le conteneur sans déformer */
+            border-radius: 5px;
+        }
+    </style>
+
+    <script>
+        // Initialiser la carte
+        var map = L.map('map').setView([56.1304, -106.3468], 4);
+
+        // Ajouter une couche de tuiles OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Fonction pour générer le contenu du popup avec Swiper
+        function generatePopupContent(lieuId, lieuNom, lieuDescription, photos) {
+            let slidesHtml = photos.map((photo, index) => `
+                <div class="swiper-slide">
+                    <img src='/uploads/images/${photo.path}' class='popup-image'>
+                </div>
+            `).join('');
+
+            return `
+                <div class="popup-content">
+                    <b>${lieuNom}</b><br>${lieuDescription}<br>
+                    <div class="swiper-container" id="swiper-container-${lieuId}">
+                        <div class="swiper-wrapper">
+                            ${slidesHtml}
+                        </div>
+                        <!-- Flèches de navigation Swiper -->
+                        <div class="swiper-button-next swiper-button-next-${lieuId}"></div>
+                        <div class="swiper-button-prev swiper-button-prev-${lieuId}"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Ajouter les lieux avec des marqueurs
+        {% for lieu in lieux %}
+        var marker = L.marker([{{ lieu.latitude }}, {{ lieu.longitude }}]).addTo(map)
+            .bindPopup(generatePopupContent(
+                "{{ lieu.id }}",
+                "{{ lieu.nom|e }}",
+                "{{ lieu.description|e }}",
+                [
+                    {% for photo in lieu.photos %}
+                    { path: "{{ photo.path }}" },
+                    {% endfor %}
+                ]
+            ));
+        {% endfor %}
+
+        // Initialiser Swiper pour chaque popup après son ouverture
+        map.on('popupopen', function(e) {
+            const popupElement = e.popup._contentNode.querySelector('.swiper-container');
+            if (popupElement) {
+                const lieuId = popupElement.id.split('-').pop();
+                new Swiper(`#${popupElement.id}`, {
+                    navigation: {
+                        nextEl: `.swiper-button-next-${lieuId}`,
+                        prevEl: `.swiper-button-prev-${lieuId}`,
+                    },
+                    loop: false,
+                    slidesPerView: 1,
+                    spaceBetween: 10,
+                    centeredSlides: true,
+                });
+            }
+        });
+    </script>
+{% endblock %}
